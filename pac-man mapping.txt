@@ -1,0 +1,25 @@
+00  - blank               -> 0x20 (32)
+01  - horizontal line     -> ═ (205)
+02  - vertical line       -> ║ (186)
+03  - top right corner    -> ╗ (187)
+04  - top left corner     -> ╔ (201)
+05  - bottom right corner -> ╝ (188)
+06  - bottom left corner  -> ╚ (200)
+07  - Top T               -> ╦ (203)
+08  - Bottom T            -> ╩ (202)
+09  - Left T              -> ╠ (204)
+10  - Right T             -> ╣ (185)
+11  - Cross               -> ╬ (206)
+12  - Ghost Gate          -> ─ (196)
+13  - Dot                 -> * (Bold White)
+14  - Power DOT           -> ■ (254)
+15  - Pinky               -> ░ (176)
+16  - Blinky              -> ▒ (177)
+17  - Inky                -> ▓ (178)
+18  - Clyde               -> █ (219)
+19  - PacMan              -> ≥ (242) East
+20  -                     -> ≤ (243) West
+21  -                     -> ∩ (239) South
+22  -                     -> U       North
+
+

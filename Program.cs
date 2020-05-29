@@ -31,13 +31,22 @@ namespace PacMan {
         Clyde
     }
 
-
     class Ghost : Character {
         public GhostBehavior Behavior;
         public char Glyph;                  //glyph that represents the Ghost
         public ConsoleColor Color;
         public bool InThePen = true;
         public int EscapeSeconds = 0;
+    }
+
+    //A* Node
+    class Location {
+        public int Row;
+        public int Col;
+        public int F;
+        public int G;
+        public int H;
+        public Location Parent;
     }
 
     class Program {
@@ -262,7 +271,9 @@ namespace PacMan {
                     }
                 } else {
                     switch( ghost.Behavior ) {
-                        case GhostBehavior.Inky: InkyBehavior( ghost ); break;
+                        case GhostBehavior.Inky:
+                            InkyBehavior( ghost );
+                            break;
                         case GhostBehavior.Blinky:
                             BlinkyBehavior( ghost );
                             break;
@@ -308,51 +319,81 @@ namespace PacMan {
             if( FrameCount % 2 != 0 )
                 return;
 
-            //chase behavior
-            //calc current position deltas
-            int rowDelta = Math.Abs(ghost.CurrentRow - PacMan.CurrentRow);
-            int colDelta = Math.Abs(ghost.CurrentCol - PacMan.CurrentCol);
+            var (row, col, direction) = ComputeAStar( ghost.CurrentRow, ghost.CurrentCol, PacMan.CurrentRow, PacMan.CurrentCol );
 
-            Direction direction = ghost.Direction;
+            ghost.PreviousCol = ghost.CurrentCol;
+            ghost.PreviousRow = ghost.CurrentRow;
+            ghost.Direction = direction;
+            ghost.CurrentRow = row;
+            ghost.CurrentCol = col;
+        }
 
-            //not allowed to change directions North to South or East to West
+        //A* Pathing
+        static int ComputeHScore( int currentRow, int currentCol, int targetRow, int targetCol )
+            => Math.Abs( targetRow - currentRow ) + Math.Abs( targetCol - currentCol );
 
-            if( rowDelta > colDelta ) {
-                //attempt to move north or south as required but only if i'm not already traveling North/South
-                if( !( ghost.Direction == Direction.North || ghost.Direction == Direction.South ) )
-                    direction = ghost.CurrentRow > PacMan.CurrentRow ? Direction.North : Direction.South;
-            } else {
-                if( !( ghost.Direction == Direction.East || ghost.Direction == Direction.West ) )
-                    direction = ghost.CurrentCol > PacMan.CurrentCol ? Direction.West : Direction.East;
-            }
+        static (int row, int col, Direction direction) ComputeAStar( int currentRow, int currentCol, int targetRow, int targetCol ) {
+            Location current = null;
+            var start = new Location { Row = currentRow, Col = currentCol};
+            var target = new Location{ Row = targetRow, Col = targetCol};
+            var openList = new List<Location>();
+            var closedList = new List<Location>();
+            int g = 0;
+            openList.Add( start );
+            while( openList.Count > 0 ) {
+                var lowest = openList.Min( k => k.F);
+                current = openList.First( k => k.F == lowest );
+                closedList.Add( current );
+                openList.Remove( current );
+                if( closedList.Any( k => k.Col == targetCol && k.Row == targetRow ) )
+                    break;
 
-            //go north if possible
-            var (r, c) = NextPosition( ghost.CurrentRow, ghost.CurrentCol, direction );
-            if( !IsValidMove( r, c ) || IsGhostGate( r, c ) ) {
-                direction = ghost.Direction;
-                while( true ) {
-                    //try moving in the current direction
-                    (r, c) = NextPosition( ghost.CurrentRow, ghost.CurrentCol, direction );
-                    if( IsValidMove( r, c ) && !IsGhostGate( r, c ) )
-                        break;
-                    else {
-                        //pick a new direction
-                        switch( direction ) {
-                            case Direction.North: direction = Direction.West; break;
-                            case Direction.South: direction = Direction.East; break;
-                            case Direction.East: direction = Direction.North; break;
-                            case Direction.West: direction = Direction.South; break;
+                var adjacentSquares = GetWalkableAdjacentSquares(current.Row,current.Col);
+                g++;
+                foreach( var adjacentSquare in adjacentSquares ) {
+                    if( closedList.Any( k => k.Row == adjacentSquare.Row && k.Col == adjacentSquare.Col ) )
+                        continue;
+                    if( !openList.Any( k => k.Row == adjacentSquare.Row && k.Col == adjacentSquare.Col ) ) {
+                        adjacentSquare.G = g;
+                        adjacentSquare.H = ComputeHScore( adjacentSquare.Row, adjacentSquare.Col, target.Row, target.Col );
+                        adjacentSquare.F = adjacentSquare.G + adjacentSquare.H;
+                        adjacentSquare.Parent = current;
+                        openList.Insert( 0, adjacentSquare );
+                    } else {
+                        if(g + adjacentSquare.H < adjacentSquare.F) {
+                            adjacentSquare.G = g;
+                            adjacentSquare.F = adjacentSquare.G + adjacentSquare.H;
+                            adjacentSquare.Parent = current;
                         }
                     }
                 }
             }
 
-            ghost.PreviousCol = ghost.CurrentCol;
-            ghost.PreviousRow = ghost.CurrentRow;
-            ghost.Direction = direction;
-            ghost.CurrentCol = c;
-            ghost.CurrentRow = r;
+            //walk it back to the child of the head of the list
+            var node = current;
+            while( node.Parent?.Parent != null )
+                node = node.Parent;
+
+            //get relative direction to current
+            var direction = Direction.North;
+            if( node.Row != currentRow )
+                direction = node.Row > currentRow ? Direction.South : Direction.North;
+            if( node.Col != currentCol )
+                direction = node.Col > currentCol ? Direction.East : Direction.West;
+
+            return (node.Row, node.Col, direction);
         }
+
+        static List<Location> GetWalkableAdjacentSquares( int row, int col ) {
+            var proposedLocations = new List<Location>() {
+                new Location { Row = row, Col = col - 1, },
+                new Location { Row = row, Col = col + 1  },
+                new Location { Row = row - 1, Col = col },
+                new Location { Row = row + 1, Col = col },
+            };
+            return proposedLocations.Where( k => IsValidMove( k.Row, k.Col ) ).ToList( );
+        }
+
 
         static void DrawGhosts( ) {
             foreach( var ghost in Ghosts ) {
@@ -373,9 +414,11 @@ namespace PacMan {
             Console.ForegroundColor = color;
             Console.Write( c );
         }
+
         static bool IsValidMove( int row, int col ) {
-            var c = Board[ row, col ];
-            return !IsWall( c );
+            if( row < 0 || row >= BoardRows ) return false;
+            if( col < 0 || col >= BoardCols ) return false;
+            return !IsWall( Board[ row, col ] );
         }
 
         static bool IsGhostGate( int row, int col ) => GhostGate == Board[ row, col ];

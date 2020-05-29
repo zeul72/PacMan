@@ -106,6 +106,17 @@ namespace PacMan {
                Color = ConsoleColor.Magenta,
                Glyph = '▓',
                EscapeSeconds = 2
+            },
+             new Ghost {
+               CurrentCol = 13,
+               PreviousCol = 13,
+               CurrentRow = 13,
+               PreviousRow = 13,
+               Direction = Direction.East,
+               Behavior = GhostBehavior.Inky,
+               Color = ConsoleColor.Red,
+               Glyph = '▒',
+               EscapeSeconds = 4
             }
         };
 
@@ -301,17 +312,49 @@ namespace PacMan {
         }
 
         static void InkyBehavior( Ghost ghost ) {
-            var direction = ghost.Direction;
-            var (r, c) = NextPosition( ghost.CurrentRow, ghost.CurrentCol, direction );
-            while( !IsValidMove( r, c ) || IsGhostGate( r, c ) ) {
-                direction = ( Direction )( ( ( int )direction + 1 ) % 4 );
-                (r, c) = NextPosition( ghost.CurrentRow, ghost.CurrentCol, direction );
+            //only execute every other frame
+            if( FrameCount % 2 != 0 )
+                return;
+
+            //target 4 tiles ahead of pac-man, unless ghost is within 4 tiles
+            var targetRow = PacMan.CurrentRow;
+            var targetCol = PacMan.CurrentCol;
+
+            if( Math.Abs( targetRow - ghost.CurrentRow ) > 4 && Math.Abs( targetCol - ghost.CurrentCol ) > 4 ) {
+                switch( PacMan.Direction ) {
+                    case Direction.North:
+                        targetRow -= 4;
+                        if( targetRow < 0 )
+                            targetRow = 0;
+                        break;
+
+                    case Direction.South:
+                        targetRow += 4;
+                        if( targetRow >= BoardRows )
+                            targetRow = BoardRows - 1;
+                        break;
+
+                    case Direction.East:
+                        targetCol += 4;
+                        if( targetCol >= BoardCols )
+                            targetCol = BoardCols - 1;
+                        break;
+
+                    case Direction.West:
+                        targetCol -= 4;
+                        if( targetCol < 0 )
+                            targetCol = 0;
+                        break;
+                }
             }
+
+            var (row, col, direction) = ComputeAStar( ghost.CurrentRow, ghost.CurrentCol, targetRow, targetCol );
+
             ghost.PreviousCol = ghost.CurrentCol;
             ghost.PreviousRow = ghost.CurrentRow;
-            ghost.CurrentRow = r;
-            ghost.CurrentCol = c;
             ghost.Direction = direction;
+            ghost.CurrentRow = row;
+            ghost.CurrentCol = col;
         }
 
         static void BlinkyBehavior( Ghost ghost ) {
@@ -360,7 +403,7 @@ namespace PacMan {
                         adjacentSquare.Parent = current;
                         openList.Insert( 0, adjacentSquare );
                     } else {
-                        if(g + adjacentSquare.H < adjacentSquare.F) {
+                        if( g + adjacentSquare.H < adjacentSquare.F ) {
                             adjacentSquare.G = g;
                             adjacentSquare.F = adjacentSquare.G + adjacentSquare.H;
                             adjacentSquare.Parent = current;
@@ -391,9 +434,8 @@ namespace PacMan {
                 new Location { Row = row - 1, Col = col },
                 new Location { Row = row + 1, Col = col },
             };
-            return proposedLocations.Where( k => IsValidMove( k.Row, k.Col ) ).ToList( );
+            return proposedLocations.Where( k => IsValidMove( k.Row, k.Col ) && !IsGhostGate( k.Row, k.Col ) ).ToList( );
         }
-
 
         static void DrawGhosts( ) {
             foreach( var ghost in Ghosts ) {

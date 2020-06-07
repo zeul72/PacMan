@@ -51,8 +51,19 @@ namespace PacMan {
 
     class Program {
 
+        const char TOP_LEFT         = '╔';
+        const char TOP_RIGHT        = '╗';
+        const char BOTTOM_LEFT      = '╚';
+        const char BOTTOM_RIGHT     = '╝';
+        const char HORIZ_BORDER     = '═';
+        const char VERT_BORDER      = '║';
+
         static readonly char GhostGate = '─';
-        static readonly List<char> WallChars = new List<char> {'═','║','╔','╚','╗','╝','╦','╩'};
+
+        static readonly List<char> WallChars = new List<char> {
+            VERT_BORDER, HORIZ_BORDER, TOP_LEFT, BOTTOM_LEFT, TOP_RIGHT, BOTTOM_RIGHT, '╦', '╩'
+        };
+
         static readonly List<char> PacManGlyphs = new List<char> { 'U', '∩', '≤', '≥' };
         static readonly Dictionary<char,ConsoleColor> Palette = new Dictionary<char, ConsoleColor> {
             { ' ', ConsoleColor.White },
@@ -125,7 +136,6 @@ namespace PacMan {
 
         static void Main( ) {
             LoadBoard( "level01.board" );
-
             InitDisplay( );
             RunCountDown( );
             GameLoop( );
@@ -150,7 +160,6 @@ namespace PacMan {
         }
 
         static void GameLoop( ) {
-
             while( true ) {
                 PacManLogic( );
                 GhostLogic( );
@@ -159,9 +168,8 @@ namespace PacMan {
                 DrawPacMan( );
                 DrawPoints( );
                 if( GameOver ) {
-                    DrawAt( 4, 5, ConsoleColor.DarkBlue, "     G A M E    O V E R     " );
-                    DrawAt( BoardTop + PacMan.CurrentRow, BoardLeft + PacMan.CurrentCol, ConsoleColor.DarkRed, 'X' );
-                    break;
+                    DrawGameOver( );
+                    break;  //exit the game loop
                 }
 
                 Thread.Sleep( 1000 / 10 );
@@ -170,6 +178,50 @@ namespace PacMan {
                 DrawFrameCount( );
                 DrawGameSeconds( );
             };
+        }
+
+        static void DrawGameOver( ) {
+            DrawBox( 15, 12, 14, 5, ConsoleColor.Yellow );
+            DrawAt( 16, 13, ConsoleColor.Yellow, " G  A  M  E " );
+            DrawAt( 17, 13, ConsoleColor.Yellow, "            " );
+            DrawAt( 18, 13, ConsoleColor.Yellow, " O  V  E  R " );
+
+            DrawAt( BoardTop + PacMan.CurrentRow, BoardLeft + PacMan.CurrentCol, ConsoleColor.DarkRed, 'X' );
+        }
+
+        static void DrawBox( int top, int left, int width, int height, ConsoleColor color ) {
+            var drawHeight = height-1;
+            var drawWidth = width-1;
+
+            var saveColor = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            //draw the 4 corners
+            Console.SetCursorPosition( left, top );
+            Console.Write( TOP_LEFT );
+            Console.SetCursorPosition( left + drawWidth, top );
+            Console.Write( TOP_RIGHT );
+
+            Console.SetCursorPosition( left, top+ drawHeight );
+            Console.Write( BOTTOM_LEFT );
+            Console.SetCursorPosition( left + drawWidth, top+drawHeight);
+            Console.Write( BOTTOM_RIGHT );
+
+            //draw the horizontial lines
+            for(int posX = left+1; posX < left+ drawWidth; posX++ ) {
+                Console.SetCursorPosition( posX, top );
+                Console.Write( HORIZ_BORDER );
+                Console.SetCursorPosition( posX, top+ drawHeight );
+                Console.Write( HORIZ_BORDER );
+            }
+            //draw the vertical lines
+            for( int posY = top+1; posY < top + drawHeight; posY++ ) {
+                Console.SetCursorPosition( left, posY );
+                Console.Write( VERT_BORDER );
+                Console.SetCursorPosition( left + drawWidth, posY );
+                Console.Write( VERT_BORDER );
+            }
+
+            Console.ForegroundColor = saveColor;
         }
 
         static bool TryGetKey( out ConsoleKeyInfo? keyInfo ) {
